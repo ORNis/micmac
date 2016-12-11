@@ -30,7 +30,7 @@ Francais :
 
 English :
 
-    MicMa cis an open source software specialized in image matching
+    MicMac is an open source software specialized in image matching
     for research in geographic information. MicMac is built on the
     eLiSe image library. MicMac is governed by the  "Cecill-B licence".
     See below and http://www.cecill.info.
@@ -59,91 +59,54 @@ void Arsenic_Banniere()
     std::cout <<  " **********************************\n\n";
 }
 
-string FindMaltEtape(int ResolModel, std::string aNameIm, std::string aPatModel)
+inline double Dist3d(const Pt3d<double> & aP1, const Pt3d<double> & aP2) //TODO: check for euclid() for Pt3d<Type>
 {
-        //Getting full image size
-        Tiff_Im aTFforSize= Tiff_Im::StdConvGen(aNameIm,1,false);
-        int aSzX = aTFforSize.sz().x;
-
-        std::string aDir,aPat;
-        SplitDirAndFile(aDir,aPat,aPatModel);
-
-        cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(aDir);
-        const std::vector<std::string> * aSetModel = aICNM->Get(aPat);
-
-        std::vector<std::string> aVectModel=*aSetModel;
-        int nbModel = (int)aVectModel.size();
-
-        int aEtape = 0;
-        for (int i=0 ; i<nbModel ; i++)
-        {
-            cElNuage3DMaille * info3D = cElNuage3DMaille::FromFileIm(aDir+aVectModel[i]);
-            //cout<<info3D->SzGeom()<<endl;
-            int ResolThisFile=float(aSzX)/float(info3D->SzGeom().x)+0.5;
-            //cout<<"ResolThisFile : "<<ResolThisFile<<endl;
-            if(ResolModel==ResolThisFile){aEtape=i+1;}
-        }
-    cout<<"MicMac step to be used = num"<<aEtape<<endl;
-
-    // Modif GM: compilation c++11
-    ostringstream oss;
-    oss << aEtape;
-    return oss.str();
-
-    //string aEtapeStr = static_cast<ostringstream*>( &(ostringstream() << aEtape) )->str();
-    //return aEtapeStr;
+    return std::sqrt(std::pow(aP1.x-aP2.x,2)+std::pow(aP1.y-aP2.y,2)+std::pow(aP1.z-aP2.z,2));
 }
 
-vector<ArsenicImage> LoadGrpImages(string aDir, std::string aPatIm, int ResolModel, string InVig)
+std::vector<ArsenicImage> LoadGrpImagesMMByP(const cMMByImNM * aMMIN, int aDs, string InVig)
 {
-    cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(aDir);
-    const std::vector<std::string> * aSetIm = aICNM->Get(aPatIm);
-    std::vector<std::string> aVectIm=*aSetIm;
 
-    //Scaling the images the comply with MM-Initial-Model
-    list<string> ListConvert, ListVig;
-    vector<std::string> VectImSc,VectMasq;
-    int nbIm = (int)aVectIm.size();
-    char ResolModelch[3];sprintf(ResolModelch, "%02d", ResolModel);string ResolModelStr=(string)ResolModelch;
-    if(ResolModel<10){ResolModelStr=ResolModelStr.substr(1,1);}
-    //If a vignette correction folder is entered
-    string postfix="";
-    if(InVig!=""){
-        string cmdVig=MMDir() + "bin/mm3d Vodka \"" + aPatIm + "\" DoCor=1 Out=" + InVig + " InCal=" + InVig;
-        postfix="_Vodka.tif";
+    cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(aDir);
+    const std::vector<std::string> * aVectIm = aICNM->Get(aPatIm);
+
+    std::list<string> ListConvert, ListVig;
+    std::vector<std::string> VectImSc, VectMasq;
+    size_t nbIm = aVectIm->size();
+
+    // If a vignette correction folder was provided
+    string postfix = "";
+    if(InVig != "")
+    {
+        std::string cmdVig = MMDir() + "bin/mm3d Vodka \"" + aPatIm + "\" DoCor=1 Out=" + InVig + " InCal=" + InVig;
+        postfix = "_Vodka.tif";
         ListVig.push_back(cmdVig);
-        cEl_GPAO::DoComInParal(ListVig,aDir + "MkVig");
+        cEl_GPAO::DoComInParal(ListVig, aDir + "MkVig");
     }
 
-    //Finding the appropriate NuageImProf_STD-MALT_Etape_[0-9].xml for the ResolModel :
-    string aEtape=FindMaltEtape(ResolModel, aDir + (aVectIm)[0], "MM-Malt-Img-" + StdPrefix(aVectIm[0]) + "/NuageImProf_STD-MALT_Etape_[0-9].xml");
 
-    //Reading images and Masq
-    for (int aK1=0 ; aK1<nbIm ; aK1++)
+    // Read images and Masks
+    for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
     {
-        string cmdConv=MMDir() + "bin/ScaleIm " + InVig + (aVectIm)[aK1] + postfix + " " + ResolModelStr + " F8B=1 Out=" + (aVectIm)[aK1] + "_Scaled.tif";
+        string cmdConv = MMDir() + "bin/ScaleIm " + InVig + (*aVectIm)[aK1] + postfix + " F8B=1 Out=" + (*aVectIm)[aK1] + "_Scaled.tif";
         ListConvert.push_back(cmdConv);
 
-        //VectMasq.push_back("Masq-TieP-" + (aVectIm)[aK1] + "/RN" + (aVectIm)[aK1] + "_Masq.tif");
-        VectMasq.push_back("MM-Malt-Img-" + StdPrefix((aVectIm)[aK1]) + "/AutoMask_STD-MALT_Num_" + aEtape + ".tif");
-        //VectMasq.push_back("MM-Malt-Img-" + StdPrefix((aVectIm)[aK1]) + "/Masq_STD-MALT_DeZoom" + ResolModelStr + ".tif");
-        //cout<<VectMasq[aK1]<<endl;
-        VectImSc.push_back((aVectIm)[aK1]+std::string("_Scaled.tif"));
+        //TODO: VectMasq.push_back("MM-Malt-Img-" + StdPrefix((aVectIm)[aK1]) + "/AutoMask_STD-MALT_Num_" + aEtape + ".tif");
+        VectImSc.push_back((*aVectIm)[aK1] + std::string("_Scaled.tif"));
     }
-    cEl_GPAO::DoComInParal(ListConvert,aDir + "MkScale");
 
+    cEl_GPAO::DoComInParal(ListConvert, aDir + "MkScale");
 
-    //Reading the infos
-    vector<ArsenicImage> aGrIm;
+    //Read the data
+    std::vector<ArsenicImage> aGrIm;
 
-    for (int aK1=0 ; aK1<int(nbIm) ; aK1++)
+    for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
     {
         ArsenicImage aIm;
         //reading 3D info
-        //cElNuage3DMaille * info3D1 = cElNuage3DMaille::FromFileIm("MM-Malt-Img-" + StdPrefix(aVectIm[aK1]) + "/NuageImProf_STD-MALT_Etape_1.xml");
-        cElNuage3DMaille * info3D1 = cElNuage3DMaille::FromFileIm("MM-Malt-Img-" + StdPrefix(aVectIm[aK1]) + "/NuageImProf_STD-MALT_Etape_" + aEtape + ".xml");
+        //TODO cElNuage3DMaille * info3D1 = cElNuage3DMaille::FromFileIm("MM-Malt-Img-" + StdPrefix((*aVectIm)[aK1]) + "/NuageImProf_STD-MALT_Etape_" + aEtape + ".xml");
 
-        aIm.info3D=info3D1;
+        //TODO: aIm.info3D=info3D1;
 
         Tiff_Im aTF1= Tiff_Im::StdConvGen(aDir + VectImSc[aK1],3,false);
         Tiff_Im aTFM= Tiff_Im::StdConvGen(aDir + VectMasq[aK1],1,false);
@@ -177,44 +140,34 @@ vector<ArsenicImage> LoadGrpImages(string aDir, std::string aPatIm, int ResolMod
     return aGrIm;
 }
 
-double Dist3d(Pt3d<double> aP1, Pt3d<double> aP2 ){
-    return (double)std::sqrt(pow(double(aP1.x-aP2.x),2)+pow(double(aP1.y-aP2.y),2)+pow(double(aP1.z-aP2.z),2));
-}
 
-cl_MatPtsHom ReadPtsHom3D(string aDir,string aPatIm, string InVig, int ResolModel, double TPA)
+cl_MatPtsHom ReadPtsHom3D(std::vector<ArsenicImage> & aGrIm,
+                          const std::vector<std::pair<size_t, size_t>> & somePairs,
+                          const int & ResolModel, const double & TPA)
 {
-    cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(aDir);
-    const std::vector<std::string> * aSetIm = aICNM->Get(aPatIm);
-    std::vector<std::string> aVectIm=*aSetIm;
-    int nbIm = (int)aVectIm.size();
+
     cl_MatPtsHom aMatPtsHomol;
-
-    //Loading all images and usefull metadata (masks...)
-    vector<ArsenicImage> aGrIm=LoadGrpImages(aDir, aPatIm, ResolModel, InVig);
-    std::cout<<"===== "<<aGrIm.size()<< " images loaded"<<endl;
-
-    //string PtsTxt="PtsTxt.txt";
-    //ofstream file_out(PtsTxt, ios::out | ios::app);
-
-    //going throug each pair of different images
-    for (int aK1=0 ; aK1<nbIm ; aK1++)
+    int nbIm = static_cast<int>(aGrIm.size());
+    //going through each pair of different images
+    for (int aK1=0 ; aK1<nbIm; ++aK1) //TODO: use somePairs there
     {
         //Creating the tie points vector
         cl_PtsRadio aPtsRadio;
         aMatPtsHomol.aMat.push_back(aPtsRadio);
-        cout<<"Extracting point from image "<<aK1+1<<" out of "<<nbIm<<endl;
-        //going throug each point of image
+        std::cout << "Extracting point from image "<< aK1+1<<" out of "<< nbIm << endl;
+        //going through each point of image
         for (int aY=0 ; aY<aGrIm[aK1].SZ.y  ; aY++)
         {
             for (int aX=0 ; aX<aGrIm[aK1].SZ.x  ; aX++)
             {
                 Pt2dr pos2DPtIm1;pos2DPtIm1.x=aX;pos2DPtIm1.y=aY;
-                if(aGrIm[aK1].Mask.data()[aY][aX]==0){continue;}else{//If pts in masq, go look for 3D position
+                if(aGrIm[aK1].Mask.data()[aY][aX]==0){continue;}
+                //If pts in masq, go look for 3D position
                     Pt3d<double> pos3DPtIm1=aGrIm[aK1].info3D->PreciseCapteur2Terrain(pos2DPtIm1);
                         //Testing the position of the point in other images
                         vector<double> distances(nbIm,10000000); //distances between original 3D point and reprojection from other images (init to "a lot")
                         vector<Pt2dr> pos2DOtherIm(nbIm);
-                        for (int aK2=0 ; aK2<int(nbIm) ; aK2++)
+                        for (int aK2=0 ; aK2<nbIm ; aK2++)
                         {
                             if (aK1!=aK2)// && aGrIm[aK2].info3D->PIsVisibleInImage(pos3DPtIm1))
                             {
@@ -236,12 +189,12 @@ cl_MatPtsHom ReadPtsHom3D(string aDir,string aPatIm, string InVig, int ResolMode
                                 //double Red1   =Reechantillonnage::biline(aGrIm[aK1].RChan.data(), aGrIm[aK1].SZ.x, aGrIm[aK1].SZ.y, pos2DPtIm1);
                                 //double Green1 =Reechantillonnage::biline(aGrIm[aK1].GChan.data(), aGrIm[aK1].SZ.x, aGrIm[aK1].SZ.y, pos2DPtIm1);
                                 //double Blue1  =Reechantillonnage::biline(aGrIm[aK1].BChan.data(), aGrIm[aK1].SZ.x, aGrIm[aK1].SZ.y, pos2DPtIm1);
-                                double Red1   =aGrIm[aK1].RChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
-                                double Green1 =aGrIm[aK1].GChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
-                                double Blue1  =aGrIm[aK1].BChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
-                                double Red2   =Reechantillonnage::biline(aGrIm[aK2].RChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
-                                double Green2 =Reechantillonnage::biline(aGrIm[aK2].GChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
-                                double Blue2  =Reechantillonnage::biline(aGrIm[aK2].BChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
+                                double Red1   = aGrIm[aK1].RChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
+                                double Green1 = aGrIm[aK1].GChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
+                                double Blue1  = aGrIm[aK1].BChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
+                                double Red2   = Reechantillonnage::biline(aGrIm[aK2].RChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
+                                double Green2 = Reechantillonnage::biline(aGrIm[aK2].GChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
+                                double Blue2  = Reechantillonnage::biline(aGrIm[aK2].BChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
                                 aMatPtsHomol.aMat[aK1].Pts.push_back(pos2DPtIm1.mul(ResolModel));
                                 if(Red1>0){aMatPtsHomol.aMat[aK1].kR.push_back((1 + Red2/Red1 )/2);}else{aMatPtsHomol.aMat[aK1].kR.push_back((1 + Red2)/2);}
                                 if(Green1>0){aMatPtsHomol.aMat[aK1].kG.push_back((1 + Green2/Green1 )/2);}else{aMatPtsHomol.aMat[aK1].kG.push_back((1 + Green2)/2);}
@@ -251,11 +204,10 @@ cl_MatPtsHom ReadPtsHom3D(string aDir,string aPatIm, string InVig, int ResolMode
                                 //file_out <<(Red2+Blue2+Green2)/(Red1+Blue1+Green1)<<endl;
                             }
                         }
-                }
+
             }
         }
     }
-    //file_out.close();
     return aMatPtsHomol;
 
 }
@@ -266,7 +218,7 @@ cl_MatPtsHom TiePtsFilter(cl_MatPtsHom aMatPtsHomol, double aThresh)
     int nbIm = (int)aMatPtsHomol.aMat.size();
     for (int numIm=0 ; numIm<nbIm ; numIm++)
     {
-        cout<<"[Im "<< numIm <<"] NbPts before filter : "<<aMatPtsHomol.aMat[numIm].size()<<endl;
+        std::cout<< "[Im "<< numIm <<"] NbPts before filter : "<< aMatPtsHomol.aMat[numIm].size()<<endl;
         double meanR=0,meanG=0,meanB=0;
         for(int i=0 ; i<aMatPtsHomol.aMat[numIm].size() ; i++)
         {
@@ -274,9 +226,12 @@ cl_MatPtsHom TiePtsFilter(cl_MatPtsHom aMatPtsHomol, double aThresh)
             meanG += aMatPtsHomol.aMat[numIm].kG[i];
             meanB += aMatPtsHomol.aMat[numIm].kB[i];
         }
-        meanR = meanR/aMatPtsHomol.aMat[numIm].size(); cout<<"Mean R = "<<meanR<<endl;
-        meanG = meanG/aMatPtsHomol.aMat[numIm].size(); cout<<"Mean G = "<<meanG<<endl;
-        meanB = meanB/aMatPtsHomol.aMat[numIm].size(); cout<<"Mean B = "<<meanB<<endl;
+        meanR = meanR/aMatPtsHomol.aMat[numIm].size();
+        std::cout << "Mean R = " << meanR << std::endl;
+        meanG = meanG/aMatPtsHomol.aMat[numIm].size();
+        std::cout << "Mean G = " << meanG << std::endl;
+        meanB = meanB/aMatPtsHomol.aMat[numIm].size();
+        std::cout << "Mean B = " << meanB << std::endl;
 
         //If a factor is different by more than "seuil" from the mean, the point is considered an outlier
         for(int i=aMatPtsHomol.aMat[numIm].size()-1 ; i>=0 ; i--)
@@ -292,16 +247,15 @@ cl_MatPtsHom TiePtsFilter(cl_MatPtsHom aMatPtsHomol, double aThresh)
                 aMatPtsHomol.aMat[numIm].OtherIm.erase(aMatPtsHomol.aMat[numIm].OtherIm.begin() + i);
             }
         }
-        cout<<"[Im "<< numIm <<"] NbPts after filter : "<<aMatPtsHomol.aMat[numIm].size()<<endl;
+        std::cout << "[Im " << numIm << "] NbPts after filter: " << aMatPtsHomol.aMat[numIm].size() << std::endl;
     }
     return aMatPtsHomol;
 }
 
 void Egal_field_correct_ite(string aDir,std::vector<std::string> * aSetIm, cl_MatPtsHom aMatPtsHomol , string aDirOut, string InVig, int ResolModel, int nbIm, int nbIte, double aThresh)
 {
-//truc à iterer--------------------------------------------------------------------------------------------------------------------------------------
 for(int iter=0;iter<nbIte;iter++){
-    cout<<"Pass "<<iter+1<<" out of "<< nbIte<<endl;
+    std::cout << "Pass "<<iter+1<<" out of "<< nbIte<<endl;
 
     //Filtering the tie points
     aMatPtsHomol = TiePtsFilter(aMatPtsHomol, aThresh);
@@ -313,10 +267,10 @@ for(int iter=0;iter<nbIte;iter++){
     for(int numImage1=0;numImage1<nbIm;numImage1++)
     {
         vector<int> cpt(nbIm,0);
-        cout<<"Computing factors for Im "<<numImage1<<endl;
+        std::cout << "Computing factors for Im " << numImage1 << std::endl;
 
         //For each tie point point, compute correction value (distance-ponderated mean value of all the tie points)
-        for(int k = 0; k<int(aMatPtsHomol.aMat[numImage1].size()) ; k++){//go through each tie point
+        for(int k = 0; k<aMatPtsHomol.aMat[numImage1].size() ; k++){//go through each tie point
             double aCorR=0.0,aCorG=0.0,aCorB=0.0;
             double aSumDist=0;
             Pt2dr aPt(aMatPtsHomol.aMat[numImage1].Pts[k].x/ResolModel,aMatPtsHomol.aMat[numImage1].Pts[k].x/ResolModel);
@@ -335,26 +289,10 @@ for(int iter=0;iter<nbIte;iter++){
             aCorB = aCorB/aSumDist;
 
             //correcting Tie points color with computed surface
-            //int numImage2=aMatPtsHomol.aMat[numImage1].OtherIm[k];
-            //int pos=cpt[numImage2];cpt[numImage2]++;
-            //if(aMatPtsHomol.aMat[numImage1][numImage2].R1[pos]*aCorR>255)
-            //{
-            //	aCorR=255/aMatPtsHomol.aMat[numImage1][numImage2].R1[pos];
-            //}
-            //if(aMatPtsHomol.aMat[numImage1][numImage2].G1[pos]*aCorB>255)
-            //{
-            //	aCorG=255/aMatPtsHomol.aMat[numImage1][numImage2].G1[pos];
-            //}
-            //if(aMatPtsHomol.aMat[numImage1][numImage2].B1[pos]*aCorG>255)
-            //{
-            //	aCorB=255/aMatPtsHomol.aMat[numImage1][numImage2].B1[pos];
-            //}
             aMatPtsHomol.aMat[numImage1].kR[k]=aCorR;
             aMatPtsHomol.aMat[numImage1].kG[k]=aCorG;
             aMatPtsHomol.aMat[numImage1].kB[k]=aCorB;
             }
-        //cout<<cpt<<endl;
-
     }
 }
 
@@ -362,11 +300,11 @@ for(int iter=0;iter<nbIte;iter++){
 aMatPtsHomol = TiePtsFilter(aMatPtsHomol, aThresh);
 
 cout<<"Factors were computed"<<endl;
-//end truc à iterer--------------------------------------------------------------------------------------------------------------------------------------
+//end truc Ã  iterer--------------------------------------------------------------------------------------------------------------------------------------
 
 
 
-//Applying the correction to the images
+    //Applying the correction to the images
     //Bulding the output file system
     ELISE_fp::MkDirRec(aDir + aDirOut);
     //Reading input files
@@ -379,40 +317,39 @@ cout<<"Factors were computed"<<endl;
     for(int i=0;i<nbIm;i++)
     {
         string aNameIm=InVig + (*aSetIm)[i] + suffix;//if vignette is used, change the name of input file to read
-        cout<<"Correcting "<<aNameIm<<" (with "<<aMatPtsHomol.aMat[i].size()<<" data points)"<<endl;
+        std::cout<<"Correcting " << aNameIm <<" (with "<< aMatPtsHomol.aMat[i].size()<<" data points)"<<endl;
         string aNameOut=aDir + aDirOut + (*aSetIm)[i] +"_egal.tif";
 
         Pt2di aSzMod=aMatPtsHomol.aMat[i].SZ;//Size of the correction surface, taken from the size of the scaled image
-        //cout<<"aSzMod"<<aSzMod<<endl;
         Im2D_REAL4  aImCorR(aSzMod.x,aSzMod.y,0.0);
         Im2D_REAL4  aImCorG(aSzMod.x,aSzMod.y,0.0);
         Im2D_REAL4  aImCorB(aSzMod.x,aSzMod.y,0.0);
         REAL4 ** aCorR = aImCorR.data();
         REAL4 ** aCorG = aImCorG.data();
         REAL4 ** aCorB = aImCorB.data();
-        //cout<<vectPtsRadioTie[i].size()<<endl;
-        //For each point of the surface, compute correction value (distance-ponderated mean value of all the tie points)
+
+        // For each point of the surface, compute correction value (distance - weighted mean value of all the tie points)
         long start=time(NULL);
         for (int aY=0 ; aY<aSzMod.y  ; aY++)
             {
                 for (int aX=0 ; aX<aSzMod.x  ; aX++)
                 {
-                    float aCorPtR=0,aCorPtG=0,aCorPtB=0;
+                    double aCorPtR=0,aCorPtG=0,aCorPtB=0;
                     double aSumDist=0;
                     Pt2dr aPt(aX,aY);
-                    for(int j = 0; j<int(aMatPtsHomol.aMat[i].size()) ; j++){//go through each tie point
+                    for(int j = 0; j<aMatPtsHomol.aMat[i].size() ; j++){//go through each tie point
                         Pt2dr aPtIn(aMatPtsHomol.aMat[i].Pts[j].x/ResolModel,aMatPtsHomol.aMat[i].Pts[j].y/ResolModel);
-                        double aDist=euclid(aPtIn, aPt);
+                        float aDist = static_cast<float>(euclid(aPtIn, aPt));
                         if(aDist<1){aDist=1;}
-                        aSumDist=aSumDist+1/(aDist);
+                        aSumDist = aSumDist+1/(aDist);
                         aCorPtR = aCorPtR + aMatPtsHomol.aMat[i].kR[j]/(aDist);
                         aCorPtG = aCorPtG + aMatPtsHomol.aMat[i].kG[j]/(aDist);
                         aCorPtB = aCorPtB + aMatPtsHomol.aMat[i].kB[j]/(aDist);
                     }
                     //Normalize
-                    aCorR[aY][aX] = aCorPtR/aSumDist;
-                    aCorG[aY][aX] = aCorPtG/aSumDist;
-                    aCorB[aY][aX] = aCorPtB/aSumDist;
+                    aCorR[aY][aX] = static_cast<float>(aCorPtR/aSumDist);
+                    aCorG[aY][aX] = static_cast<float>(aCorPtG/aSumDist);
+                    aCorB[aY][aX] = static_cast<float>(aCorPtB/aSumDist);
                 }
             }
 
@@ -444,13 +381,13 @@ cout<<"Factors were computed"<<endl;
                 {
                     Pt2dr aPt(double(aX/ResolModel),double(aY/ResolModel));
                     //To be able to correct the edges
-                        if(aPt.x>aSzMod.x-2){aPt.x=aSzMod.x-2;}
-                        if(aPt.y>aSzMod.y-2){aPt.y=aSzMod.y-2;}
+                    if(aPt.x>aSzMod.x-2){aPt.x=aSzMod.x-2;}
+                    if(aPt.y>aSzMod.y-2){aPt.y=aSzMod.y-2;}
                     //Bilinear interpolation from the scaled surface to the full scale image
                     double R = aDataR[aY][aX]*Reechantillonnage::biline(aCorR, aSzMod.x, aSzMod.y, aPt);
                     double G = aDataG[aY][aX]*Reechantillonnage::biline(aCorG, aSzMod.x, aSzMod.y, aPt);
                     double B = aDataB[aY][aX]*Reechantillonnage::biline(aCorB, aSzMod.x, aSzMod.y, aPt);
-                    //Overrun management:
+                    //Underflow and Overflow handling:
                     if(R>255){aDataR[aY][aX]=255;}else if(R<0){aDataR[aY][aX]=0;}else{aDataR[aY][aX]=R;}
                     if(G>255){aDataG[aY][aX]=255;}else if(G<0){aDataG[aY][aX]=0;}else{aDataG[aY][aX]=G;}
                     if(B>255){aDataB[aY][aX]=255;}else if(B<0){aDataB[aY][aX]=0;}else{aDataB[aY][aX]=B;}
@@ -479,15 +416,14 @@ cout<<"Factors were computed"<<endl;
     }
 }
 
-int  Arsenic_main(int argc,char ** argv)
+int Arsenic_main(int argc,char ** argv)
 {
 
     std::string aFullPattern,aDirOut="Egal/",InVig="";
-    //bool InTxt=false;
     int ResolModel=16;
     double TPA=16,aThresh=1.4;
     int nbIte=5;
-      //Reading the arguments
+        //Reading arguments
         ElInitArgMain
         (
             argc,argv,
@@ -514,11 +450,11 @@ int  Arsenic_main(int argc,char ** argv)
             ELISE_ASSERT(nbIm>1,"Less than two images found with this pattern");
 
             //Computing homologous points
-            cout<<"Computing homologous points"<<endl;
+            std::cout << "Computing homologous points" << std::endl;
             cl_MatPtsHom aMatPtsHomol=ReadPtsHom3D(aDir, aPatIm, InVig, ResolModel, TPA);
 
             //Computing and applying the equalization surface
-            cout<<"Computing and applying the equalization surface"<<endl;
+            std::cout << "Computing and applying the equalization surface" << std::endl;
             Egal_field_correct_ite(aDir, & aVectIm, aMatPtsHomol, aDirOut, InVig, ResolModel, nbIm, nbIte, aThresh);
 
             Arsenic_Banniere();
@@ -527,36 +463,82 @@ int  Arsenic_main(int argc,char ** argv)
         return 0;
 }
 
+
+cAppliCorrColor::cAppliCorrColor(int argc, char **argv):
+        cAppliWithSetImage(argc-1,argv+1,0),
+        mModeMMByP (eQuickMac)
+{
+
+    std::string aPat, anOri,
+            aDirOut="Egal/", aVignDir="";
+    std::string aModeMMByP;
+    int aDs=1;
+    double TPA=16,aThresh=1.4;
+    int nbIte=5;
+
+    ElInitArgMain
+            (
+                    argc,argv,
+                    LArgMain()  << EAMC(aPat,"Full Directory (Dir+Pattern)",eSAM_IsPatFile)
+                                << EAMC(anOri,"Orientation", eSAM_IsExistDirOri),
+                    LArgMain()  << EAM(aDirOut,"Out",true,"Output folder (end with /) and/or prefix (end with another char)")
+                                << EAM(aModeMMByP,"ModeMMByP",true,"Mode used in MMByP", eSAM_None,ListOfVal(eNbTypeMMByP,"e"))
+                                << EAM(aVignDir,"InVig",true,"Input vignette folder (for example : Vignette/ )")
+                                << EAM(aDs,"DownScale",true,"Down scale images reduce computation time (Def=1)")
+                                << EAM(TPA,"TPA",true,"Tie Point Accuracy (Higher is better, lower gives more points Def=16)")
+                                << EAM(nbIte,"NbIte",true,"Number of iterations of the process (default=5)")
+                                << EAM(aThresh,"ThreshDisp",true,"color discrepancy threshold between tie points (Def=1.4 for 40%)")
+            );
+
+    if (EAMIsInit(&aModeMMByP))
+    {
+        bool aModeHelp;
+        StdReadEnum(aModeHelp,mModeMMByP,aModeMMByP,eNbTypeMMByP);
+    }
+
+    cMMByImNM * aMMIN = cMMByImNM::ForGlobMerge(Dir(),aDs,aModeMMByP); //TODO: make this a class field
+
+    std::cout << this->DirAndPatFileOfImSec() << std::endl;
+
+    Arsenic_Banniere();
+}
+
+
+int PIMsCorrColor_main(int argc, char ** argv)
+{
+    cAppliCorrColor anAppli(argc, argv);
+    return EXIT_SUCCESS;
+}
+
 /*Footer-MicMac-eLiSe-25/06/2007
 
-Ce logiciel est un programme informatique servant à la mise en
+Ce logiciel est un programme informatique servant ï¿½ la mise en
 correspondances d'images pour la reconstruction du relief.
 
-Ce logiciel est régi par la licence CeCILL-B soumise au droit français et
+Ce logiciel est rï¿½gi par la licence CeCILL-B soumise au droit franï¿½ais et
 respectant les principes de diffusion des logiciels libres. Vous pouvez
 utiliser, modifier et/ou redistribuer ce programme sous les conditions
-de la licence CeCILL-B telle que diffusée par le CEA, le CNRS et l'INRIA
+de la licence CeCILL-B telle que diffusï¿½e par le CEA, le CNRS et l'INRIA
 sur le site "http://www.cecill.info".
 
-En contrepartie de l'accessibilité au code source et des droits de copie,
-de modification et de redistribution accordés par cette licence, il n'est
-offert aux utilisateurs qu'une garantie limitée.  Pour les mêmes raisons,
-seule une responsabilité restreinte pèse sur l'auteur du programme,  le
-titulaire des droits patrimoniaux et les concédants successifs.
+En contrepartie de l'accessibilitï¿½ au code source et des droits de copie,
+de modification et de redistribution accordï¿½s par cette licence, il n'est
+offert aux utilisateurs qu'une garantie limitï¿½e.  Pour les mï¿½mes raisons,
+seule une responsabilitï¿½ restreinte pï¿½se sur l'auteur du programme,  le
+titulaire des droits patrimoniaux et les concï¿½dants successifs.
 
-A cet égard  l'attention de l'utilisateur est attirée sur les risques
-associés au chargement,  à l'utilisation,  à la modification et/ou au
-développement et à la reproduction du logiciel par l'utilisateur étant
-donné sa spécificité de logiciel libre, qui peut le rendre complexe à
-manipuler et qui le réserve donc à des développeurs et des professionnels
-avertis possédant  des  connaissances  informatiques approfondies.  Les
-utilisateurs sont donc invités à charger  et  tester  l'adéquation  du
-logiciel à leurs besoins dans des conditions permettant d'assurer la
-sécurité de leurs systèmes et ou de leurs données et, plus généralement,
-à l'utiliser et l'exploiter dans les mêmes conditions de sécurité.
+A cet ï¿½gard  l'attention de l'utilisateur est attirï¿½e sur les risques
+associï¿½s au chargement,  ï¿½ l'utilisation,  ï¿½ la modification et/ou au
+dï¿½veloppement et ï¿½ la reproduction du logiciel par l'utilisateur ï¿½tant
+donnï¿½ sa spï¿½cificitï¿½ de logiciel libre, qui peut le rendre complexe ï¿½
+manipuler et qui le rï¿½serve donc ï¿½ des dï¿½veloppeurs et des professionnels
+avertis possï¿½dant  des  connaissances  informatiques approfondies.  Les
+utilisateurs sont donc invitï¿½s ï¿½ charger  et  tester  l'adï¿½quation  du
+logiciel ï¿½ leurs besoins dans des conditions permettant d'assurer la
+sï¿½curitï¿½ de leurs systï¿½mes et ou de leurs donnï¿½es et, plus gï¿½nï¿½ralement,
+ï¿½ l'utiliser et l'exploiter dans les mï¿½mes conditions de sï¿½curitï¿½.
 
-Le fait que vous puissiez accéder à cet en-tête signifie que vous avez
-pris connaissance de la licence CeCILL-B, et que vous en avez accepté les
+Le fait que vous puissiez accï¿½der ï¿½ cet en-tï¿½te signifie que vous avez
+pris connaissance de la licence CeCILL-B, et que vous en avez acceptï¿½ les
 termes.
 Footer-MicMac-eLiSe-25/06/2007*/
-

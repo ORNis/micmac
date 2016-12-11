@@ -1,6 +1,17 @@
 #ifndef ARSENIC_H
 #define ARSENIC_H
-//#include "StdAfx.h"
+#include "StdAfx.h"
+
+static const std::string aNameTmpArsenicDir = "Tmp-Arsenic";
+
+class cAppliCorrColor :  public cAppliWithSetImage
+{
+public:
+	cAppliCorrColor(int argc, char ** argv);
+
+private:
+	eTypeMMByP mModeMMByP;
+};
 
 class GrpVodka
 {

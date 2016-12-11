@@ -204,6 +204,7 @@ int TestBundleInter_main(int argc,char ** argv);
 
 int Ratafia_Main(int argc,char ** argv);
 
+extern int PIMsCorrColor_main(int argc,char ** argv);
 
 const std::vector<cMMCom> & getAvailableCommands()
 {
@@ -445,8 +446,8 @@ const std::vector<cMMCom> & getAvailableCommands()
        aRes.push_back(cMMCom("C3DC",C3DC_main,"Automatic Matching from Culture 3D Cloud project"));
        aRes.push_back(cMMCom("PIMs",MPI_main,"Per Image Matchings"));
        aRes.push_back(cMMCom("PIMs2Ply",MPI2Ply_main,"Generate Ply from Per Image Matchings"));
-       aRes.push_back(cMMCom("PIMs2Mnt",MPI2Mnt_main,"Generate Mnt from Per Image Matchings"));
-
+       aRes.push_back(cMMCom("PIMs2Mnt",MPI2Mnt_main,"Generate MNT from Per Image Matchings"));
+       aRes.push_back(cMMCom("PIMsCorrColor",PIMsCorrColor_main,"Arsenic for PIMs"));
 
        aRes.push_back(cMMCom("AllDev",DoAllDev_main,"Force development of all tif/xif file"));
        aRes.push_back(cMMCom("SetExif",CPP_SetExif,"Modification of exif file (requires exiv2)",cArgLogCom(2)));

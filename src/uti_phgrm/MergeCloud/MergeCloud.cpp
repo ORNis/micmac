@@ -442,7 +442,6 @@ int CPP_AppliMergeCloud(int argc,char ** argv)
 {
     cAppliMergeCloud anAppli(argc,argv);
 
-
     return EXIT_SUCCESS;
 }
 

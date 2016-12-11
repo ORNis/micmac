@@ -265,7 +265,7 @@ class cStatNiv
 
 class cAppliMergeCloud : public cAppliWithSetImage
 {
-    public :
+    public:
 
 /*
        std::string NameFileInput(bool DownScale,const std::string & aNameIm,const std::string & aPost,const std::string & aPref="");

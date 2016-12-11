@@ -131,7 +131,7 @@ const std::string cMMByImNM::TheNamePimsEtat = "PimsEtat.xml";
 
 bool  cMMByImNM::StrIsPImsDIr(const std::string & aDir)
 {
-    return    ELISE_fp::exist_file(aDir+TheNamePimsFile)
+    return ELISE_fp::exist_file(aDir+TheNamePimsFile)
            && ELISE_fp::exist_file(aDir+TheNamePimsEtat);
 }
 
@@ -273,7 +273,7 @@ cMMByImNM *  cMMByImNM::FromExistingDirOrMatch(const std::string & aNameDirOri,b
      }
 
 
-     if (! Svp)
+     if (!Svp)
      {
          std::cout << "For, Dir=" << aNameDirOri << " DS=" << aDS << "\n";
          ELISE_ASSERT(false,"Cannot find PIMs Directory");
@@ -286,7 +286,7 @@ cMMByImNM *  cMMByImNM::FromExistingDirOrMatch(const std::string & aNameDirOri,b
 
 cMMByImNM * cMMByImNM::ForMTDMerge(const std::string & aDirGlob,const std::string & aNameIm,const std::string & aNameType)
 {
-   return new cMMByImNM(1.0,aDirGlob, TheDIRMergeEPI()  +   aNameIm + "/","QMNuage-",aNameType);
+   return new cMMByImNM(1.0,aDirGlob, TheDIRMergeEPI() + aNameIm + "/","QMNuage-",aNameType);
 }
 
 

@@ -383,7 +383,7 @@ void cAppli_C3DC::DoAll()
              break;
 
              default :
-                  std::cout <<  mStrType  << " : not supported for now\n";
+                  std::cout << mStrType << ": not supported for now\n";
                   ELISE_ASSERT(false,"Unsupported value in C3DC");
              break;
         }
@@ -426,7 +426,6 @@ class cChantierFromMPI
        std::string    mStrType;
        std::string    mFullDirPIm;
        std::string    mFullDirChantier;
-
 };
 
 
@@ -446,8 +445,6 @@ cChantierFromMPI::cChantierFromMPI(const std::string & aStr,double aScale,const 
         std::cout << "For Name=" << aStr  << " Scale=" << aScale << "\n";
         ELISE_ASSERT(false,"Reused PIMs was not correctly terminated");
     }
-
-
 }
 
 
@@ -471,8 +468,7 @@ class cAppli_MPI2Ply
 };
 
 
-cAppli_MPI2Ply::cAppli_MPI2Ply(int argc,char ** argv):
-    mDS (1.0)
+cAppli_MPI2Ply::cAppli_MPI2Ply(int argc,char ** argv): mDS (1.0)
 {
    ElInitArgMain
    (
@@ -482,25 +478,23 @@ cAppli_MPI2Ply::cAppli_MPI2Ply(int argc,char ** argv):
                     << EAM(mDS,"DS",true,"Dowscale, Def=1.0")
                     << EAM(mMergeOut,"Out",true,"Ply File Results")
                     << EAM(mPat,"Pat",true,"Pattern for selecting images (Def=All image in files)",eSAM_IsPatFile)
-    );
-
+   );
     if(MMVisualMode) return;
 
     mCFPI = new cChantierFromMPI(mName,mDS,mPat);
 
-    mComNuageMerge =       MM3dBinFile("TestLib  MergeCloud ")
-                  +   mCFPI-> mCFPIStrImOri0
-                  + " ModeMerge=" + mCFPI->mStrType
-                  + " DownScale=" +ToString(mDS)
-                  + " SzNorm=3"
-                  + " PlyCoul=true"
-               ;
+    mComNuageMerge = MM3dBinFile("TestLib  MergeCloud ")
+                     +   mCFPI->mCFPIStrImOri0
+                     + " ModeMerge=" + mCFPI->mStrType
+                     + " DownScale=" +ToString(mDS)
+                     + " SzNorm=3"
+                     + " PlyCoul=true";
 
-   std::string aPatPly = "Nuage-Merge-" +mPat + ".*.ply";
+    std::string aPatPly = "Nuage-Merge-" +mPat + ".*.ply";
 
 
-   if (! EAMIsInit(&mMergeOut)) mMergeOut =  mCFPI->mFullDirChantier+"C3DC_"+ mCFPI->mStrType + ".ply";
-   mComCatPly =  MM3dBinFile("MergePly ") + QUOTE( mCFPI->mFullDirPIm + aPatPly) + " Out="  + mMergeOut;
+   if (! EAMIsInit(&mMergeOut)) mMergeOut = mCFPI->mFullDirChantier+"C3DC_"+ mCFPI->mStrType + ".ply";
+   mComCatPly = MM3dBinFile("MergePly ") + QUOTE( mCFPI->mFullDirPIm + aPatPly) + " Out=" + mMergeOut;
 }
 
 void cAppli_MPI2Ply::DoAll()

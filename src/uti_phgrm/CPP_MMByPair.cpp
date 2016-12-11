@@ -1123,7 +1123,7 @@ cAppliClipChantier::cAppliClipChantier(int argc,char ** argv) :
                       aCO.OrIntImaM2C().SetVal(El2Xml(aM2CCliped));
                       // Sinon ca ne marche pas pour le match
                       aCO.Interne().Val().PixelSzIm().SetVal(Pt2dr(aSZ));
-                // aCO.Interne().Val().SzIm() = aSZ;
+                      //aCO.Interne().Val().SzIm() = aSZ;
                 }
                 else
                 {
@@ -1275,7 +1275,7 @@ cAppliMMByPair::cAppliMMByPair(int argc,char ** argv) :
     mExpTxt        (false),
     mExpImSec      (true),
     mSuprImNoMasq  (false),
-    mPIMsDirName   ("Statue") // used in MMEnvStatute for differenciating PIMs-Forest from PIMs-Statue
+    mPIMsDirName   ("Statue") // used in MMEnvStatute to differenciate PIMs-Forest from PIMs-Statue
 
 {
   if ((argc>=2) && (!mModeHelp))
@@ -1825,7 +1825,7 @@ void cAppliMMByPair::DoFusionEpip()
        for (tItSAWSI anITS=mGrIm.begin(mSubGrAll); anITS.go_on() ; anITS++)
        {
             std::string aNameIm = (*anITS).attr().mIma->mNameIm;
-            std::string aCom =      MMBinFile(MM3DStr) + " TestLib MMEnvStatute " + aNameIm + " PIMsDirName=" + mPIMsDirName;
+            std::string aCom = MMBinFile(MM3DStr) + " TestLib MMEnvStatute " + aNameIm + " PIMsDirName=" + mPIMsDirName;
             aLCom.push_back(aCom);
             std::cout << aCom << "\n";
 

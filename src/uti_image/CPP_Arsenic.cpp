@@ -64,83 +64,6 @@ inline double Dist3d(const Pt3d<double> & aP1, const Pt3d<double> & aP2) //TODO:
     return std::sqrt(std::pow(aP1.x-aP2.x,2)+std::pow(aP1.y-aP2.y,2)+std::pow(aP1.z-aP2.z,2));
 }
 
-std::vector<ArsenicImage> LoadGrpImagesMMByP(const cMMByImNM * aMMIN, int aDs, string InVig)
-{
-
-    cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(aDir);
-    const std::vector<std::string> * aVectIm = aICNM->Get(aPatIm);
-
-    std::list<string> ListConvert, ListVig;
-    std::vector<std::string> VectImSc, VectMasq;
-    size_t nbIm = aVectIm->size();
-
-    // If a vignette correction folder was provided
-    string postfix = "";
-    if(InVig != "")
-    {
-        std::string cmdVig = MMDir() + "bin/mm3d Vodka \"" + aPatIm + "\" DoCor=1 Out=" + InVig + " InCal=" + InVig;
-        postfix = "_Vodka.tif";
-        ListVig.push_back(cmdVig);
-        cEl_GPAO::DoComInParal(ListVig, aDir + "MkVig");
-    }
-
-
-    // Read images and Masks
-    for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
-    {
-        string cmdConv = MMDir() + "bin/ScaleIm " + InVig + (*aVectIm)[aK1] + postfix + " F8B=1 Out=" + (*aVectIm)[aK1] + "_Scaled.tif";
-        ListConvert.push_back(cmdConv);
-
-        //TODO: VectMasq.push_back("MM-Malt-Img-" + StdPrefix((aVectIm)[aK1]) + "/AutoMask_STD-MALT_Num_" + aEtape + ".tif");
-        VectImSc.push_back((*aVectIm)[aK1] + std::string("_Scaled.tif"));
-    }
-
-    cEl_GPAO::DoComInParal(ListConvert, aDir + "MkScale");
-
-    //Read the data
-    std::vector<ArsenicImage> aGrIm;
-
-    for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
-    {
-        ArsenicImage aIm;
-        //reading 3D info
-        //TODO cElNuage3DMaille * info3D1 = cElNuage3DMaille::FromFileIm("MM-Malt-Img-" + StdPrefix((*aVectIm)[aK1]) + "/NuageImProf_STD-MALT_Etape_" + aEtape + ".xml");
-
-        //TODO: aIm.info3D=info3D1;
-
-        Tiff_Im aTF1= Tiff_Im::StdConvGen(aDir + VectImSc[aK1],3,false);
-        Tiff_Im aTFM= Tiff_Im::StdConvGen(aDir + VectMasq[aK1],1,false);
-        Pt2di aSz = aTF1.sz();
-        Im2D_REAL4  aIm1R(aSz.x,aSz.y);
-        Im2D_REAL4  aIm1G(aSz.x,aSz.y);
-        Im2D_REAL4  aIm1B(aSz.x,aSz.y);
-        Im2D_INT1  aMasq(aSz.x,aSz.y);
-        ELISE_COPY
-            (
-                aTF1.all_pts(),
-                aTF1.in(),
-                Virgule(aIm1R.out(),aIm1G.out(),aIm1B.out())
-            );
-
-        ELISE_COPY
-            (
-                aTFM.all_pts(),
-                aTFM.in(),
-                aMasq.out()
-            );
-
-        aIm.Mask=aMasq;
-        aIm.RChan=aIm1R;
-        aIm.GChan=aIm1G;
-        aIm.BChan=aIm1B;
-        aIm.SZ=aSz;
-        aGrIm.push_back(aIm);
-    }
-
-    return aGrIm;
-}
-
-
 cl_MatPtsHom ReadPtsHom3D(std::vector<ArsenicImage> & aGrIm,
                           const std::vector<std::pair<size_t, size_t>> & somePairs,
                           const int & ResolModel, const double & TPA)
@@ -201,7 +124,6 @@ cl_MatPtsHom ReadPtsHom3D(std::vector<ArsenicImage> & aGrIm,
                                 if(Blue1>0){aMatPtsHomol.aMat[aK1].kB.push_back((1 + Blue2/Blue1 )/2);}else{aMatPtsHomol.aMat[aK1].kB.push_back((1 + Blue2)/2);}
                                 aMatPtsHomol.aMat[aK1].OtherIm.push_back(aK2);
                                 aMatPtsHomol.aMat[aK1].SZ=aGrIm[aK1].SZ;
-                                //file_out <<(Red2+Blue2+Green2)/(Red1+Blue1+Green1)<<endl;
                             }
                         }
 
@@ -212,13 +134,13 @@ cl_MatPtsHom ReadPtsHom3D(std::vector<ArsenicImage> & aGrIm,
 
 }
 
-cl_MatPtsHom TiePtsFilter(cl_MatPtsHom aMatPtsHomol, double aThresh)
+void TiePtsFilter(cl_MatPtsHom & aMatPtsHomol, double aThresh)
 {
     //Computing the mean of the correction factor
     int nbIm = (int)aMatPtsHomol.aMat.size();
     for (int numIm=0 ; numIm<nbIm ; numIm++)
     {
-        std::cout<< "[Im "<< numIm <<"] NbPts before filter : "<< aMatPtsHomol.aMat[numIm].size()<<endl;
+        std::cout<< "[Im "<< numIm <<"] NbPts before filter : "<< aMatPtsHomol.aMat[numIm].size() << std::endl;
         double meanR=0,meanG=0,meanB=0;
         for(int i=0 ; i<aMatPtsHomol.aMat[numIm].size() ; i++)
         {
@@ -249,27 +171,31 @@ cl_MatPtsHom TiePtsFilter(cl_MatPtsHom aMatPtsHomol, double aThresh)
         }
         std::cout << "[Im " << numIm << "] NbPts after filter: " << aMatPtsHomol.aMat[numIm].size() << std::endl;
     }
-    return aMatPtsHomol;
 }
 
-void Egal_field_correct_ite(string aDir,std::vector<std::string> * aSetIm, cl_MatPtsHom aMatPtsHomol , string aDirOut, string InVig, int ResolModel, int nbIm, int nbIte, double aThresh)
+void Egal_field_correct_ite(
+        std::string aDir,
+        std::vector<std::string> * aSetIm,
+        cl_MatPtsHom & aMatPtsHomol,
+        const std::string & aDirOut,
+        const std::string InVig,
+        int ResolModel,
+        int nbIm,
+        int nbIte,
+        double aThresh)
 {
 for(int iter=0;iter<nbIte;iter++){
     std::cout << "Pass "<<iter+1<<" out of "<< nbIte<<endl;
-
     //Filtering the tie points
-    aMatPtsHomol = TiePtsFilter(aMatPtsHomol, aThresh);
+    TiePtsFilter(aMatPtsHomol, aThresh);
 
-//Correcting the tie points
-
-//#pragma omp parallel for
-
-    for(int numImage1=0;numImage1<nbIm;numImage1++)
+    //Correcting the tie points
+    //TODO: #pragma omp parallel for
+    for(int numImage1 = 0;numImage1 < nbIm; ++numImage1)
     {
-        vector<int> cpt(nbIm,0);
         std::cout << "Computing factors for Im " << numImage1 << std::endl;
 
-        //For each tie point point, compute correction value (distance-ponderated mean value of all the tie points)
+        // For each tie point point, compute correction value (distance-ponderated mean value of all the tie points)
         for(int k = 0; k<aMatPtsHomol.aMat[numImage1].size() ; k++){//go through each tie point
             double aCorR=0.0,aCorG=0.0,aCorB=0.0;
             double aSumDist=0;
@@ -292,20 +218,17 @@ for(int iter=0;iter<nbIte;iter++){
             aMatPtsHomol.aMat[numImage1].kR[k]=aCorR;
             aMatPtsHomol.aMat[numImage1].kG[k]=aCorG;
             aMatPtsHomol.aMat[numImage1].kB[k]=aCorB;
-            }
+        }
     }
 }
 
-//Filtering the tie points
-aMatPtsHomol = TiePtsFilter(aMatPtsHomol, aThresh);
+    // Filter the tie points
+    TiePtsFilter(aMatPtsHomol, aThresh);
 
-cout<<"Factors were computed"<<endl;
-//end truc à iterer--------------------------------------------------------------------------------------------------------------------------------------
+    std::cout << "Factors were computed" << std::endl;
 
-
-
-    //Applying the correction to the images
-    //Bulding the output file system
+    // Applying the correction to the images
+    // Bulding the output file system
     ELISE_fp::MkDirRec(aDir + aDirOut);
     //Reading input files
     string suffix="";if(InVig!=""){suffix="_Vodka.tif";}
@@ -415,7 +338,7 @@ cout<<"Factors were computed"<<endl;
 
     }
 }
-
+/*
 int Arsenic_main(int argc,char ** argv)
 {
 
@@ -462,7 +385,7 @@ int Arsenic_main(int argc,char ** argv)
 
         return 0;
 }
-
+*/
 
 cAppliCorrColor::cAppliCorrColor(int argc, char **argv):
         cAppliWithSetImage(argc-1,argv+1,0),
@@ -496,11 +419,106 @@ cAppliCorrColor::cAppliCorrColor(int argc, char **argv):
         StdReadEnum(aModeHelp,mModeMMByP,aModeMMByP,eNbTypeMMByP);
     }
 
-    cMMByImNM * aMMIN = cMMByImNM::ForGlobMerge(Dir(),aDs,aModeMMByP); //TODO: make this a class field
+    mMMIN = cMMByImNM::ForGlobMerge(Dir(),aDs,aModeMMByP); //TODO: make this a class field
 
-    std::cout << this->DirAndPatFileOfImSec() << std::endl;
-
+    //TODO: read clouds and discard image without enough points
     Arsenic_Banniere();
+}
+
+
+void cAppliCorrColor::LoadGrpImagesMMByP(const std::string & InVig, int aDs)
+{
+
+    cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(Dir());
+    const std::vector<std::string> * aVectIm = aICNM->Get(mMMIN->KeyFileLON());
+
+    std::list<string> ListConvert, ListVig;
+    std::vector<std::string> VectImSc, VectMasq;
+    size_t nbIm = aVectIm->size();
+
+    // If a vignette correction folder was provided
+    std::string postfix = "";
+    if(InVig != "")
+    {
+        std::string cmdVig = MM3dBinFile_quotes("Vodka")
+                             + mMMIN->KeyFileLON()
+                             + " DoCor=1 Out=" + InVig
+                             + " InCal=" + InVig;
+
+        postfix = "_Vodka.tif";
+        ListVig.push_back(cmdVig);
+        cEl_GPAO::DoComInParal(ListVig);
+    }
+
+    //TODO: use a mecanism "a la" MergeCloud
+
+    // Read images and Masks
+    for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
+    {
+
+        if(aDs != 1)
+        {
+            std::string cmdConvImg = MM3dBinFile_quotes("ScaleIm")
+                                  + InVig
+                                  + (*aVectIm)[aK1] + postfix
+                                  + " F8B=1 Out=" + NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1];
+
+
+
+            std::string cmdConvMask = MM3dBinFile_quotes("ScaleIm")
+                                  + mMMIN->NameFileMasq(eTMIN_Depth, (*aVectIm)[aK1])
+                                  + " F8B=1 Out=" + NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1] + "_mask.tif";
+
+            std::string cmdConvCloud = MM3dBinFile_quotes("ScaleNuage")
+                                       + mMMIN->NameFileXml(eTMIN_Depth, (*aVectIm)[aK1])
+            //TODO: here
+            ListConvert.push_back(cmdConvImg);
+            ListConvert.push_back(cmdConvMask);
+            //TODO clouds ListConvert.push_back()
+        }
+
+        VectMasq.push_back(NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1] +"_mask.tif");
+        VectImSc.push_back(NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1]);
+    }
+
+    cEl_GPAO::DoComInParal(ListConvert);
+
+    //Read the data
+    std::vector<ArsenicImage> aGrIm;
+
+    for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
+    {
+        ArsenicImage aIm; //TODO: a true constructor
+
+        // reading 3D info
+        cElNuage3DMaille * info3D1 = cElNuage3DMaille::FromFileIm("MM-Malt-Img-" + StdPrefix((*aVectIm)[aK1]) + "/NuageImProf_STD-MALT_Etape_" + aEtape + ".xml");
+
+        //TODO: aIm.info3D=info3D1;
+
+        Tiff_Im aTF1 = Tiff_Im::StdConvGen(Dir() + VectImSc[aK1],3,false);
+        Tiff_Im aTFM = Tiff_Im::StdConvGen(Dir() + VectMasq[aK1],1,false);
+        Pt2di aSz = aTF1.sz();
+        Im2D_REAL4  aIm1R(aSz.x,aSz.y);
+        Im2D_REAL4  aIm1G(aSz.x,aSz.y);
+        Im2D_REAL4  aIm1B(aSz.x,aSz.y);
+        Im2D_INT1  aMasq(aSz.x,aSz.y);
+        ELISE_COPY(
+                aTF1.all_pts(),
+                aTF1.in(),
+                Virgule(aIm1R.out(),aIm1G.out(),aIm1B.out()));
+
+        ELISE_COPY(
+                aTFM.all_pts(),
+                aTFM.in(),
+                aMasq.out());
+
+        aIm.Mask = aMasq;
+        aIm.RChan = aIm1R;
+        aIm.GChan = aIm1G;
+        aIm.BChan = aIm1B;
+        aIm.SZ = aSz;
+        aGrIm.push_back(aIm);
+    }
 }
 
 

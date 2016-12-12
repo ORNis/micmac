@@ -2,15 +2,31 @@
 #define ARSENIC_H
 #include "StdAfx.h"
 
-static const std::string aNameTmpArsenicDir = "Tmp-Arsenic";
+class ArsenicImage
+{
+public:
+	ArsenicImage(){}
+	~ArsenicImage(){}
+	Im2D_REAL4 RChan;
+	Im2D_REAL4 GChan;
+	Im2D_REAL4 BChan;
+	Im2D_INT1 Mask;
+	cElNuage3DMaille* info3D;
+	Pt2di SZ;
+};
+
 
 class cAppliCorrColor :  public cAppliWithSetImage
 {
 public:
 	cAppliCorrColor(int argc, char ** argv);
+	void LoadGrpImagesMMByP(const std::string & InVig, int aDs);
+	static const std::string NameTmpDirArsenic(){return "Tmp-Arsenic";} ;
 
 private:
 	eTypeMMByP mModeMMByP;
+	cMMByImNM * mMMIN = nullptr;
+	std::vector<ArsenicImage> mVectArsenicImage;
 };
 
 class GrpVodka
@@ -25,18 +41,6 @@ public:
 	int size(){return (int)this->aListIm.size();}
 };
 
-class ArsenicImage
-{
-public:
-	ArsenicImage(){}
-	~ArsenicImage(){}
-	Im2D_REAL4 RChan;
-	Im2D_REAL4 GChan;
-	Im2D_REAL4 BChan;
-	Im2D_INT1 Mask;
-	cElNuage3DMaille* info3D;
-	Pt2di SZ;
-};
 
 class Param3Chan
 {

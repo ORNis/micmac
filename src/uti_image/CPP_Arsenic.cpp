@@ -64,76 +64,6 @@ inline double Dist3d(const Pt3d<double> & aP1, const Pt3d<double> & aP2) //TODO:
     return std::sqrt(std::pow(aP1.x-aP2.x,2)+std::pow(aP1.y-aP2.y,2)+std::pow(aP1.z-aP2.z,2));
 }
 
-cl_MatPtsHom ReadPtsHom3D(std::vector<ArsenicImage> & aGrIm,
-                          const std::vector<std::pair<size_t, size_t>> & somePairs,
-                          const int & ResolModel, const double & TPA)
-{
-
-    cl_MatPtsHom aMatPtsHomol;
-    int nbIm = static_cast<int>(aGrIm.size());
-    //going through each pair of different images
-    for (int aK1=0 ; aK1<nbIm; ++aK1) //TODO: use somePairs there
-    {
-        //Creating the tie points vector
-        cl_PtsRadio aPtsRadio;
-        aMatPtsHomol.aMat.push_back(aPtsRadio);
-        std::cout << "Extracting point from image "<< aK1+1<<" out of "<< nbIm << endl;
-        //going through each point of image
-        for (int aY=0 ; aY<aGrIm[aK1].SZ.y  ; aY++)
-        {
-            for (int aX=0 ; aX<aGrIm[aK1].SZ.x  ; aX++)
-            {
-                Pt2dr pos2DPtIm1;pos2DPtIm1.x=aX;pos2DPtIm1.y=aY;
-                if(aGrIm[aK1].Mask.data()[aY][aX]==0){continue;}
-                //If pts in masq, go look for 3D position
-                    Pt3d<double> pos3DPtIm1=aGrIm[aK1].info3D->PreciseCapteur2Terrain(pos2DPtIm1);
-                        //Testing the position of the point in other images
-                        vector<double> distances(nbIm,10000000); //distances between original 3D point and reprojection from other images (init to "a lot")
-                        vector<Pt2dr> pos2DOtherIm(nbIm);
-                        for (int aK2=0 ; aK2<nbIm ; aK2++)
-                        {
-                            if (aK1!=aK2)// && aGrIm[aK2].info3D->PIsVisibleInImage(pos3DPtIm1))
-                            {
-                            Pt2dr pos2DPtIm2=aGrIm[aK2].info3D->Ter2Capteur(pos3DPtIm1);
-                            //if pt in image and in masq, go look for 2D position, then 3D position
-                            if(pos2DPtIm2.x>0 && pos2DPtIm2.x<aGrIm[aK2].SZ.x && pos2DPtIm2.y>0 && pos2DPtIm2.y<aGrIm[aK2].SZ.y){
-                                        if(aGrIm[aK2].Mask.data()[int(pos2DPtIm2.y)][int(pos2DPtIm2.x)]){
-                                            pos2DOtherIm[aK2]=pos2DPtIm2;
-                                            Pt3d<double> pos3DPtIm2=aGrIm[aK2].info3D->PreciseCapteur2Terrain(pos2DPtIm2);
-                                            //Compute Distance between the 2 3D points to check if they are the same ones (occlusion, beware!)
-                                            distances[aK2]=Dist3d(pos3DPtIm1,pos3DPtIm2);
-                                        }
-                                    }
-                            }else{aMatPtsHomol.aMat[aK1].SZ=aGrIm[aK1].SZ;}
-                        }
-                        for (int aK2=0 ; aK2<int(nbIm) ; aK2++){
-                            if(distances[aK2]<(aGrIm[aK1].info3D->ResolSolOfPt(pos3DPtIm1))/TPA){//id pos3DPtIm1~=pos3DPtIm2 -->pt is considered homologous,it is added to PtsHom (Gr1, R1, G1, B1, X1, Y1, idem 2, NbPtsCouple++)
-                                //Go looking for grey value of the point for each chan (Reechantillonnage/interpolation because pos2DPtIm not always integer)
-                                //double Red1   =Reechantillonnage::biline(aGrIm[aK1].RChan.data(), aGrIm[aK1].SZ.x, aGrIm[aK1].SZ.y, pos2DPtIm1);
-                                //double Green1 =Reechantillonnage::biline(aGrIm[aK1].GChan.data(), aGrIm[aK1].SZ.x, aGrIm[aK1].SZ.y, pos2DPtIm1);
-                                //double Blue1  =Reechantillonnage::biline(aGrIm[aK1].BChan.data(), aGrIm[aK1].SZ.x, aGrIm[aK1].SZ.y, pos2DPtIm1);
-                                double Red1   = aGrIm[aK1].RChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
-                                double Green1 = aGrIm[aK1].GChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
-                                double Blue1  = aGrIm[aK1].BChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
-                                double Red2   = Reechantillonnage::biline(aGrIm[aK2].RChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
-                                double Green2 = Reechantillonnage::biline(aGrIm[aK2].GChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
-                                double Blue2  = Reechantillonnage::biline(aGrIm[aK2].BChan.data(), aGrIm[aK2].SZ.x, aGrIm[aK2].SZ.y, pos2DOtherIm[aK2]);
-                                aMatPtsHomol.aMat[aK1].Pts.push_back(pos2DPtIm1.mul(ResolModel));
-                                if(Red1>0){aMatPtsHomol.aMat[aK1].kR.push_back((1 + Red2/Red1 )/2);}else{aMatPtsHomol.aMat[aK1].kR.push_back((1 + Red2)/2);}
-                                if(Green1>0){aMatPtsHomol.aMat[aK1].kG.push_back((1 + Green2/Green1 )/2);}else{aMatPtsHomol.aMat[aK1].kG.push_back((1 + Green2)/2);}
-                                if(Blue1>0){aMatPtsHomol.aMat[aK1].kB.push_back((1 + Blue2/Blue1 )/2);}else{aMatPtsHomol.aMat[aK1].kB.push_back((1 + Blue2)/2);}
-                                aMatPtsHomol.aMat[aK1].OtherIm.push_back(aK2);
-                                aMatPtsHomol.aMat[aK1].SZ=aGrIm[aK1].SZ;
-                            }
-                        }
-
-            }
-        }
-    }
-    return aMatPtsHomol;
-
-}
-
 void TiePtsFilter(cl_MatPtsHom & aMatPtsHomol, double aThresh)
 {
     //Computing the mean of the correction factor
@@ -185,7 +115,7 @@ void Egal_field_correct_ite(
         double aThresh)
 {
 for(int iter=0;iter<nbIte;iter++){
-    std::cout << "Pass "<<iter+1<<" out of "<< nbIte<<endl;
+    std::cout << "Pass "<< iter+1 << " out of "<< nbIte << std::endl;
     //Filtering the tie points
     TiePtsFilter(aMatPtsHomol, aThresh);
 
@@ -277,7 +207,7 @@ for(int iter=0;iter<nbIte;iter++){
             }
 
         long end = time(NULL);
-        cout<<"Correction field computed in "<<end-start<<" sec, applying..."<<endl;
+        cout << "Correction field computed in " << end-start<< " sec, applying..." << std::endl;
 
         //Reading the image and creating the objects to be manipulated
         Tiff_Im aTF= Tiff_Im::StdConvGen(aDir + aNameIm,3,false);
@@ -338,54 +268,8 @@ for(int iter=0;iter<nbIte;iter++){
 
     }
 }
-/*
-int Arsenic_main(int argc,char ** argv)
-{
 
-    std::string aFullPattern,aDirOut="Egal/",InVig="";
-    int ResolModel=16;
-    double TPA=16,aThresh=1.4;
-    int nbIte=5;
-        //Reading arguments
-        ElInitArgMain
-        (
-            argc,argv,
-            LArgMain()  << EAMC(aFullPattern,"Images Pattern", eSAM_IsPatFile),
-            LArgMain()  << EAM(aDirOut,"Out",true,"Output folder (end with /) and/or prefix (end with another char)")
-                        << EAM(InVig,"InVig",true,"Input vignette folder (for example : Vignette/ )", eSAM_IsDir)
-                        << EAM(ResolModel,"ResolModel",true,"Resol of input model (Def=16)")
-                        << EAM(TPA,"TPA",true,"Tie Point Accuracy (Higher is better, lower gives more points Def=16)")
-                        << EAM(nbIte,"NbIte",true,"Number of iteration of the process (default=5)")
-                        << EAM(aThresh,"ThreshDisp",true,"Disparity threshold between the tie points (Def=1.4 for 40%)")
-        );
-
-        if (!MMVisualMode)
-        {
-            std::string aDir,aPatIm;
-            SplitDirAndFile(aDir,aPatIm,aFullPattern);
-
-            cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(aDir);
-            const std::vector<std::string> * aSetIm = aICNM->Get(aPatIm);
-
-            std::vector<std::string> aVectIm=*aSetIm;
-            int nbIm = (int)aVectIm.size();
-
-            ELISE_ASSERT(nbIm>1,"Less than two images found with this pattern");
-
-            //Computing homologous points
-            std::cout << "Computing homologous points" << std::endl;
-            cl_MatPtsHom aMatPtsHomol=ReadPtsHom3D(aDir, aPatIm, InVig, ResolModel, TPA);
-
-            //Computing and applying the equalization surface
-            std::cout << "Computing and applying the equalization surface" << std::endl;
-            Egal_field_correct_ite(aDir, & aVectIm, aMatPtsHomol, aDirOut, InVig, ResolModel, nbIm, nbIte, aThresh);
-
-            Arsenic_Banniere();
-        }
-
-        return 0;
-}
-*/
+int Arsenic_main(int argc,char ** argv) {} //FIXME Axe that
 
 cAppliCorrColor::cAppliCorrColor(int argc, char **argv):
         cAppliWithSetImage(argc-1,argv+1,0),
@@ -419,21 +303,35 @@ cAppliCorrColor::cAppliCorrColor(int argc, char **argv):
         StdReadEnum(aModeHelp,mModeMMByP,aModeMMByP,eNbTypeMMByP);
     }
 
-    mMMIN = cMMByImNM::ForGlobMerge(Dir(),aDs,aModeMMByP); //TODO: make this a class field
+    //mMMIN = cMMByImNM::ForGlobMerge(Dir(),aDs,aModeMMByP); //FIXME aDs != MMByP aDs
 
+    ELISE_fp::MkDirSvp(NameTmpDirArsenic());
+    mMMIN = cMMByImNM::ForGlobMerge(Dir(),1,aModeMMByP);
+    LoadGrpImagesMMByP(aVignDir, aDs);
     //TODO: read clouds and discard image without enough points
-    Arsenic_Banniere();
+
+  //Computing homologous points
+  std::cout << "Computing homologous points" << std::endl;
+  ReadPtsHom3D(TPA);
+
+  /*
+  //Computing and applying the equalization surface
+  std::cout << "Computing and applying the equalization surface" << std::endl;
+  Egal_field_correct_ite(aDir, & aVectIm, aMatPtsHomol, aDirOut, InVig, ResolModel, nbIm, nbIte, aThresh);
+  */
+
+  Arsenic_Banniere();
 }
 
 
-void cAppliCorrColor::LoadGrpImagesMMByP(const std::string & InVig, int aDs)
+void cAppliCorrColor::LoadGrpImagesMMByP(const std::string & InVig, int aDs) //TODO: make these class fields
 {
 
     cInterfChantierNameManipulateur * aICNM = cInterfChantierNameManipulateur::BasicAlloc(Dir());
     const std::vector<std::string> * aVectIm = aICNM->Get(mMMIN->KeyFileLON());
 
     std::list<string> ListConvert, ListVig;
-    std::vector<std::string> VectImSc, VectMasq;
+    std::vector<std::string> VectImSc, VectCloud;
     size_t nbIm = aVectIm->size();
 
     // If a vignette correction folder was provided
@@ -452,75 +350,136 @@ void cAppliCorrColor::LoadGrpImagesMMByP(const std::string & InVig, int aDs)
 
     //TODO: use a mecanism "a la" MergeCloud
 
-    // Read images and Masks
+    // Read images, clouds
     for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
     {
-
+        std::string aRelPathIm = InVig + "." + ELISE_STR_DIR + (*aVectIm)[aK1] + postfix;
+        std::string aRelPathCloud = mMMIN->NameFileXml(eTMIN_Depth, (*aVectIm)[aK1]); //FIXME names should be computed by a method
+        //TODO: Glob dir ? ^
         if(aDs != 1)
         {
+            std::string aNewRelPathIm = NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1] + ".tif";
+            std::string aNewRelPathCloud = NameTmpDirArsenic() + ELISE_STR_DIR + cElFilename(mMMIN->NameFileXml(eTMIN_Depth, (*aVectIm)[aK1])).m_basename;
+
+            std::cout << aNewRelPathCloud << std::endl;
             std::string cmdConvImg = MM3dBinFile_quotes("ScaleIm")
-                                  + InVig
-                                  + (*aVectIm)[aK1] + postfix
-                                  + " F8B=1 Out=" + NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1];
-
-
-
-            std::string cmdConvMask = MM3dBinFile_quotes("ScaleIm")
-                                  + mMMIN->NameFileMasq(eTMIN_Depth, (*aVectIm)[aK1])
-                                  + " F8B=1 Out=" + NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1] + "_mask.tif";
+                                     + aRelPathIm + BLANK
+                                     + ToString(aDs)
+                                     + " F8B=1 Out=" + aNewRelPathIm;
 
             std::string cmdConvCloud = MM3dBinFile_quotes("ScaleNuage")
-                                       + mMMIN->NameFileXml(eTMIN_Depth, (*aVectIm)[aK1])
-            //TODO: here
+                                       + aRelPathCloud + BLANK
+                                       + (aNewRelPathCloud.substr(0, aNewRelPathCloud.size() - 4)) //TODO: is there something better in Elise?
+                                       + BLANK
+                                       + ToString(aDs) + BLANK
+                                       + "InDirLoc=0";
+
             ListConvert.push_back(cmdConvImg);
-            ListConvert.push_back(cmdConvMask);
-            //TODO clouds ListConvert.push_back()
+            ListConvert.push_back(cmdConvCloud);
+
+            std::swap(aRelPathIm, aNewRelPathIm);
+            std::swap(aRelPathCloud, aNewRelPathCloud);
         }
 
-        VectMasq.push_back(NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1] +"_mask.tif");
-        VectImSc.push_back(NameTmpDirArsenic() + ELISE_STR_DIR + (*aVectIm)[aK1]);
+        VectImSc.push_back(aRelPathIm);
+        VectCloud.push_back(aRelPathCloud);
     }
 
     cEl_GPAO::DoComInParal(ListConvert);
 
-    //Read the data
-    std::vector<ArsenicImage> aGrIm;
-
     for (size_t aK1=0 ; aK1<nbIm ; ++aK1)
     {
-        ArsenicImage aIm; //TODO: a true constructor
+        ArsenicImage aIm; //TODO: a true constructor or a struct
 
         // reading 3D info
-        cElNuage3DMaille * info3D1 = cElNuage3DMaille::FromFileIm("MM-Malt-Img-" + StdPrefix((*aVectIm)[aK1]) + "/NuageImProf_STD-MALT_Etape_" + aEtape + ".xml");
-
-        //TODO: aIm.info3D=info3D1;
-
+        aIm.info3D = cElNuage3DMaille::FromFileIm(Dir() + VectCloud[aK1]);
         Tiff_Im aTF1 = Tiff_Im::StdConvGen(Dir() + VectImSc[aK1],3,false);
-        Tiff_Im aTFM = Tiff_Im::StdConvGen(Dir() + VectMasq[aK1],1,false);
         Pt2di aSz = aTF1.sz();
         Im2D_REAL4  aIm1R(aSz.x,aSz.y);
         Im2D_REAL4  aIm1G(aSz.x,aSz.y);
         Im2D_REAL4  aIm1B(aSz.x,aSz.y);
-        Im2D_INT1  aMasq(aSz.x,aSz.y);
-        ELISE_COPY(
-                aTF1.all_pts(),
-                aTF1.in(),
-                Virgule(aIm1R.out(),aIm1G.out(),aIm1B.out()));
-
-        ELISE_COPY(
-                aTFM.all_pts(),
-                aTFM.in(),
-                aMasq.out());
-
-        aIm.Mask = aMasq;
+        ELISE_COPY(aTF1.all_pts(),
+                   aTF1.in(),
+                   Virgule(aIm1R.out(),aIm1G.out(),aIm1B.out()));
         aIm.RChan = aIm1R;
         aIm.GChan = aIm1G;
         aIm.BChan = aIm1B;
         aIm.SZ = aSz;
-        aGrIm.push_back(aIm);
+        mVectArsenicImage.push_back(aIm);
     }
 }
 
+
+void cAppliCorrColor::ReadPtsHom3D(const double & TPA)
+{
+
+  int nbIm = static_cast<int>(mVectArsenicImage.size());
+  //going through each pair of different images
+  for (int aK1=0 ; aK1<nbIm; ++aK1) //TODO: use Some Pairs there or a graph precomputed
+  {
+    //Creating the tie points vector
+    cl_PtsRadio aPtsRadio;
+    mMatPtsHom.aMat.push_back(aPtsRadio);
+    std::cout << "Extracting points from image "<< aK1+1 <<" out of "<< nbIm << endl;
+    //going through each point of image
+    for (int aY=0 ; aY < mVectArsenicImage[aK1].SZ.y; aY++)
+    {
+      for (int aX=0 ; aX < mVectArsenicImage[aK1].SZ.x; aX++)
+      {
+        Pt2dr pos2DPtIm1(aX, aY);
+        if(mVectArsenicImage[aK1].info3D->ImMask().data()[aY][aX]==0)
+          continue;
+        //If pts in masq, go look for 3D position
+        Pt3d<double> pos3DPtIm1 = mVectArsenicImage[aK1].info3D->PreciseCapteur2Terrain(pos2DPtIm1);
+        //Testing the position of the point in other images
+        vector<double> distances(nbIm, std::numeric_limits<double>::max()); //distances between original 3D point and reprojection from other images (init to "a lot")
+        vector<Pt2dr> pos2DOtherIm(nbIm);
+        for (int aK2=0 ; aK2<nbIm ; aK2++)
+        {
+          if (aK1 != aK2)// && aGrIm[aK2].info3D->PIsVisibleInImage(pos3DPtIm1))
+          {
+            Pt2dr pos2DPtIm2 = mVectArsenicImage[aK2].info3D->Ter2Capteur(pos3DPtIm1);
+            //if pt in image and in masq, go look for 2D position, then 3D position
+            if(pos2DPtIm2.x>0 && pos2DPtIm2.x < mVectArsenicImage[aK2].SZ.x && pos2DPtIm2.y>0 && pos2DPtIm2.y < mVectArsenicImage[aK2].SZ.y)
+            {
+              if(mVectArsenicImage[aK2].info3D->ImMask().data()[int(pos2DPtIm2.y)][int(pos2DPtIm2.x)])
+              {
+                pos2DOtherIm[aK2] = pos2DPtIm2;
+                Pt3d<double> pos3DPtIm2=mVectArsenicImage[aK2].info3D->PreciseCapteur2Terrain(pos2DPtIm2);
+                //Compute Distance between the 2 3D points to check if they are the same ones (occlusion, beware!)
+                distances[aK2]=Dist3d(pos3DPtIm1,pos3DPtIm2);
+              }
+            }
+          }
+          else
+          {
+            mMatPtsHom.aMat[aK1].SZ = mVectArsenicImage[aK1].SZ;
+          }
+        }
+        for (int aK2=0 ; aK2 < nbIm ; aK2++)
+        {
+          if(distances[aK2] < (mVectArsenicImage[aK1].info3D->ResolSolOfPt(pos3DPtIm1))/TPA)
+          {//id pos3DPtIm1~=pos3DPtIm2 -->pt is considered homologous,it is added to PtsHom (Gr1, R1, G1, B1, X1, Y1, idem 2, NbPtsCouple++)
+            //Go looking for grey value of the point for each chan (Reechantillonnage/interpolation because pos2DPtIm not always integer)
+            double Red1   = mVectArsenicImage[aK1].RChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
+            double Green1 = mVectArsenicImage[aK1].GChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
+            double Blue1  = mVectArsenicImage[aK1].BChan.data()[int(pos2DPtIm1.y)][int(pos2DPtIm1.x)];
+            double Red2   = Reechantillonnage::biline(mVectArsenicImage[aK2].RChan.data(), mVectArsenicImage[aK2].SZ.x, mVectArsenicImage[aK2].SZ.y, pos2DOtherIm[aK2]);
+            double Green2 = Reechantillonnage::biline(mVectArsenicImage[aK2].GChan.data(), mVectArsenicImage[aK2].SZ.x, mVectArsenicImage[aK2].SZ.y, pos2DOtherIm[aK2]);
+            double Blue2  = Reechantillonnage::biline(mVectArsenicImage[aK2].BChan.data(), mVectArsenicImage[aK2].SZ.x, mVectArsenicImage[aK2].SZ.y, pos2DOtherIm[aK2]);
+            mMatPtsHom.aMat[aK1].Pts.push_back(pos2DPtIm1.mul(mVectArsenicImage[aK1].info3D->ResolImRefFromCapteur()));
+            if(Red1>0) {mMatPtsHom.aMat[aK1].kR.push_back((1 + Red2/Red1 )/2);}else{mMatPtsHom.aMat[aK1].kR.push_back((1 + Red2)/2);}
+            if(Green1>0){mMatPtsHom.aMat[aK1].kG.push_back((1 + Green2/Green1 )/2);}else{mMatPtsHom.aMat[aK1].kG.push_back((1 + Green2)/2);}
+            if(Blue1>0){mMatPtsHom.aMat[aK1].kB.push_back((1 + Blue2/Blue1 )/2);}else{mMatPtsHom.aMat[aK1].kB.push_back((1 + Blue2)/2);}
+            mMatPtsHom.aMat[aK1].OtherIm.push_back(aK2);
+            mMatPtsHom.aMat[aK1].SZ = mVectArsenicImage[aK1].SZ;
+          }
+        }
+
+      }
+    }
+  }
+}
 
 int PIMsCorrColor_main(int argc, char ** argv)
 {

@@ -84,8 +84,10 @@ class cAppliCorrColor :  public cAppliWithSetImage
 {
 public:
 	cAppliCorrColor(int argc, char ** argv);
-	void LoadGrpImagesMMByP(const std::string & InVig, int aDs);
-  void ReadPtsHom3D(const double & TPA);
+	void loadGrpImagesMMByP(const std::string &InVig, int aDs);
+  void readPtsHom3D(const double &TPA);
+  void computePairsFromChImSec();
+  void egalFieldCorrect(const std::string &aDirOut, const std::string InVig, int nbIte, double aThresh);
 
   static const std::string NameTmpDirArsenic(){return "Tmp-Arsenic";} ;
 
@@ -94,6 +96,7 @@ private:
 	cMMByImNM * mMMIN;
   int mGlobDs;
   cl_MatPtsHom mMatPtsHom;
+  std::map<size_t, std::list<size_t> > mMapNeighborsIm;
 	std::vector<ArsenicImage> mVectArsenicImage;
 };
 

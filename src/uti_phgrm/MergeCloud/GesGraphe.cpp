@@ -90,7 +90,7 @@ void  cAppliMergeCloud::CreateGrapheConx()
    {
        tMCSom * aS1 =  mVSoms[aK];
 
-       const cOneSolImageSec *   aSol = aS1->attr()->SolOfCostPerIm(mParam.CostPerImISOM().Val());
+       const cOneSolImageSec * aSol = aS1->attr()->SolOfCostPerIm(mParam.CostPerImISOM().Val());
 
        if (aSol)
        {
